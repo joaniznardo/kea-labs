@@ -1,0 +1,14 @@
+# Containerlab runtime directories
+**/clab-*/
+
+# Docker build context
+**/.docker/
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db

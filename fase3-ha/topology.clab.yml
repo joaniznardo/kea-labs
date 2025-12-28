@@ -1,0 +1,146 @@
+# Fase 3: Alta Disponibilitat (Load-Balancing)
+# =============================================
+# - 2 servidors Kea DHCP4 en mode load-balancing
+# - Xarxa heartbeat dedicada (10.50.99.0/24)
+# - 3 VLANs amb relays
+# - Clients i perfdhcp
+#
+# Desplegament: ./scripts/deploy.sh ha
+
+name: kea-lab-ha
+
+mgmt:
+  network: clab-mgmt
+  ipv4-subnet: 172.20.20.0/24
+
+topology:
+  nodes:
+    # ==================
+    # BRIDGES
+    # ==================
+    br-backend:
+      kind: bridge
+    br-vlan10:
+      kind: bridge
+    br-vlan20:
+      kind: bridge
+    br-vlan30:
+      kind: bridge
+
+    # ==================
+    # SERVIDORS KEA HA
+    # ==================
+
+    kea-primary:
+      kind: linux
+      image: docker.cloudsmith.io/isc/docker/kea-dhcp4:2.6.1
+      binds:
+        - ./configs/kea-primary/kea-dhcp4.conf:/etc/kea/kea-dhcp4.conf:ro
+      startup-delay: 5
+      exec:
+        - ip addr add 10.50.1.10/24 dev eth1
+        - ip addr add 10.50.99.10/24 dev eth2
+        - ip route add 10.50.10.0/24 via 10.50.1.20
+        - ip route add 10.50.20.0/24 via 10.50.1.21
+        - ip route add 10.50.30.0/24 via 10.50.1.22
+
+    kea-secondary:
+      kind: linux
+      image: docker.cloudsmith.io/isc/docker/kea-dhcp4:2.6.1
+      binds:
+        - ./configs/kea-secondary/kea-dhcp4.conf:/etc/kea/kea-dhcp4.conf:ro
+      startup-delay: 5
+      exec:
+        - ip addr add 10.50.1.11/24 dev eth1
+        - ip addr add 10.50.99.11/24 dev eth2
+        - ip route add 10.50.10.0/24 via 10.50.1.20
+        - ip route add 10.50.20.0/24 via 10.50.1.21
+        - ip route add 10.50.30.0/24 via 10.50.1.22
+
+    # ==================
+    # RELAYS DHCP
+    # ==================
+
+    relay-vlan10:
+      kind: linux
+      image: kea-relay:latest
+      env:
+        DHCP_SERVER: "10.50.1.10 10.50.1.11"
+        LISTEN_INTERFACE: "eth2"
+      startup-delay: 10
+      exec:
+        - ip addr add 10.50.1.20/24 dev eth1
+        - ip addr add 10.50.10.1/24 dev eth2
+
+    relay-vlan20:
+      kind: linux
+      image: kea-relay:latest
+      env:
+        DHCP_SERVER: "10.50.1.10 10.50.1.11"
+        LISTEN_INTERFACE: "eth2"
+      startup-delay: 10
+      exec:
+        - ip addr add 10.50.1.21/24 dev eth1
+        - ip addr add 10.50.20.1/24 dev eth2
+
+    relay-vlan30:
+      kind: linux
+      image: kea-relay:latest
+      env:
+        DHCP_SERVER: "10.50.1.10 10.50.1.11"
+        LISTEN_INTERFACE: "eth2"
+      startup-delay: 10
+      exec:
+        - ip addr add 10.50.1.22/24 dev eth1
+        - ip addr add 10.50.30.1/24 dev eth2
+
+    # ==================
+    # CLIENTS
+    # ==================
+
+    client-vlan10:
+      kind: linux
+      image: nicolaka/netshoot:latest
+
+    client-vlan20:
+      kind: linux
+      image: nicolaka/netshoot:latest
+
+    client-vlan30:
+      kind: linux
+      image: nicolaka/netshoot:latest
+
+    # ==================
+    # PROVES
+    # ==================
+
+    perfdhcp:
+      kind: linux
+      image: nicolaka/netshoot:latest
+      cmd: sleep infinity
+
+  links:
+    # Xarxa Heartbeat HA (10.50.99.0/24) - directe entre servidors
+    - endpoints: ["kea-primary:eth2", "kea-secondary:eth2"]
+
+    # Xarxa Backend (Kea <-> Relays) - 10.50.1.0/24
+    - endpoints: ["kea-primary:eth1", "br-backend:be-kp"]
+    - endpoints: ["kea-secondary:eth1", "br-backend:be-ks"]
+    - endpoints: ["relay-vlan10:eth1", "br-backend:be-r10"]
+    - endpoints: ["relay-vlan20:eth1", "br-backend:be-r20"]
+    - endpoints: ["relay-vlan30:eth1", "br-backend:be-r30"]
+
+    # VLAN 10 - 10.50.10.0/24
+    - endpoints: ["relay-vlan10:eth2", "br-vlan10:v10-relay"]
+    - endpoints: ["client-vlan10:eth1", "br-vlan10:v10-cli"]
+    - endpoints: ["perfdhcp:eth1", "br-vlan10:v10-perf"]
+
+    # VLAN 20 - 10.50.20.0/24
+    - endpoints: ["relay-vlan20:eth2", "br-vlan20:v20-relay"]
+    - endpoints: ["client-vlan20:eth1", "br-vlan20:v20-cli"]
+    - endpoints: ["perfdhcp:eth2", "br-vlan20:v20-perf"]
+
+    # VLAN 30 - 10.50.30.0/24
+    - endpoints: ["relay-vlan30:eth2", "br-vlan30:v30-relay"]
+    - endpoints: ["client-vlan30:eth1", "br-vlan30:v30-cli"]
+    - endpoints: ["perfdhcp:eth3", "br-vlan30:v30-perf"]

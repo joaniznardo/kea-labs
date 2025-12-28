@@ -1,0 +1,44 @@
+# Kea DHCP4 amb Control Agent i Stork Agent
+# Utilitza Ubuntu per compatibilitat amb paquets ISC
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Instal·lar dependències bàsiques
+RUN apt-get update && apt-get install -y \
+    curl \
+    gnupg \
+    ca-certificates \
+    supervisor \
+    iproute2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Afegir repositori Cloudsmith per Kea
+RUN curl -1sLf 'https://dl.cloudsmith.io/public/isc/kea-2-6/setup.deb.sh' | bash
+
+# Afegir repositori Cloudsmith per Stork
+RUN curl -1sLf 'https://dl.cloudsmith.io/public/isc/stork/setup.deb.sh' | bash
+
+# Instal·lar Kea DHCP4, Control Agent i Stork Agent
+RUN apt-get update && apt-get install -y \
+    isc-kea-dhcp4 \
+    isc-kea-ctrl-agent \
+    isc-kea-hooks \
+    isc-stork-agent \
+    && rm -rf /var/lib/apt/lists/*
+
+# Crear directoris necessaris
+RUN mkdir -p /var/run/kea /var/lib/kea /var/log/kea /var/log/supervisor
+
+# Copiar configuració de supervisord
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Exposar ports
+# 8000: kea-ctrl-agent API
+EXPOSE 8000
+
+# Variables d'entorn per defecte
+ENV STORK_SERVER_URL=http://stork-server:8080
+
+# Punt d'entrada
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

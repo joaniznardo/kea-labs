@@ -1,0 +1,33 @@
+# Stork Server per monitorització de Kea
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Instal·lar dependències
+RUN apt-get update && apt-get install -y \
+    curl \
+    gnupg \
+    ca-certificates \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Afegir repositori de Cloudsmith per Stork
+RUN curl -1sLf 'https://dl.cloudsmith.io/public/isc/stork/setup.deb.sh' | bash
+
+# Instal·lar Stork Server
+RUN apt-get update && apt-get install -y \
+    isc-stork-server \
+    && rm -rf /var/lib/apt/lists/*
+
+# Exposar port web
+EXPOSE 8080
+
+# Variables d'entorn per defecte
+ENV STORK_DATABASE_HOST=postgres
+ENV STORK_DATABASE_PORT=5432
+ENV STORK_DATABASE_NAME=stork
+ENV STORK_DATABASE_USER_NAME=postgres
+ENV STORK_DATABASE_PASSWORD=postgres
+
+# Punt d'entrada
+CMD ["stork-server"]

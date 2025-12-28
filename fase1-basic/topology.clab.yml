@@ -1,0 +1,47 @@
+# Fase 1: Kea DHCP4 Bàsic
+# ========================
+# - Servidor Kea DHCP4 amb memfile
+# - Un client netshoot
+# - perfdhcp per a proves
+# - Xarxa directa (sense relay)
+#
+# Desplegament: ./scripts/deploy.sh 1
+
+name: kea-lab-basic
+
+mgmt:
+  network: clab-mgmt
+  ipv4-subnet: 172.20.20.0/24
+
+topology:
+  nodes:
+    # Bridge per la xarxa DHCP
+    br-dhcp:
+      kind: bridge
+
+    # Servidor Kea DHCP4
+    kea:
+      kind: linux
+      image: docker.cloudsmith.io/isc/docker/kea-dhcp4:2.6.1
+      binds:
+        - ./configs/kea/kea-dhcp4.conf:/etc/kea/kea-dhcp4.conf:ro
+      startup-delay: 5
+      exec:
+        - ip addr add 10.50.10.1/24 dev eth1
+
+    # Client per proves manuals
+    client1:
+      kind: linux
+      image: nicolaka/netshoot:latest
+
+    # Contenidor per a proves de rendiment amb perfdhcp
+    perfdhcp:
+      kind: linux
+      image: docker.cloudsmith.io/isc/docker/kea-dhcp4:2.6.1
+      cmd: sleep infinity
+
+  links:
+    # Xarxa DHCP (10.50.10.0/24)
+    - endpoints: ["kea:eth1", "br-dhcp:eth1"]
+    - endpoints: ["client1:eth1", "br-dhcp:eth2"]
+    - endpoints: ["perfdhcp:eth1", "br-dhcp:eth3"]

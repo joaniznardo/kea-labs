@@ -34,6 +34,7 @@
         .fase2 { background: #9b59b6; }
         .fase3 { background: #e67e22; }
         .fase4 { background: #27ae60; }
+        .fase5 { background: #e74c3c; }
     </style>
 </head>
 <body>
@@ -62,6 +63,10 @@
                     <tr>
                         <td><span class="fase-badge fase4">Fase 4</span></td>
                         <td>Monitorització Stork</td>
+                    </tr>
+                    <tr>
+                        <td><span class="fase-badge fase5">Fase 5</span></td>
+                        <td>Prometheus + Grafana</td>
                     </tr>
                 </table>
             </section>
@@ -103,6 +108,7 @@ sudo containerlab destroy --topo topology.clab.yml</code></pre>
 ├── fase2-vlans/           # + VLANs amb relays
 ├── fase3-ha/              # + Alta disponibilitat
 ├── fase4-stork/           # + Monitorització
+├── fase5-prometheus/      # + Prometheus + Grafana
 └── scripts/
     ├── deploy.sh          # Desplegar fase
     ├── destroy.sh         # Destruir lab
@@ -953,6 +959,337 @@ docker exec clab-kea-lab-stork-postgres \
                 </section>
             </section>
 
+            <!-- ==================== FASE 5: PROMETHEUS + GRAFANA ==================== -->
+            <section>
+                <section>
+                    <span class="fase-badge fase5">Fase 5</span>
+                    <h2>Prometheus + Grafana</h2>
+                    <p>Mètriques avançades i alertes</p>
+                </section>
+
+                <section>
+                    <h3>Arquitectura Prometheus + Grafana</h3>
+                    <div class="diagram">
+                        <svg viewBox="0 0 600 350" style="width: 100%; max-width: 700px;">
+                            <!-- Prometheus -->
+                            <rect x="20" y="20" width="120" height="60" fill="#e6522c" rx="5"/>
+                            <text x="80" y="50" text-anchor="middle" fill="white" font-size="12">Prometheus</text>
+                            <text x="80" y="65" text-anchor="middle" fill="white" font-size="9">:9091</text>
+
+                            <!-- Grafana -->
+                            <rect x="180" y="20" width="120" height="60" fill="#f46800" rx="5"/>
+                            <text x="240" y="50" text-anchor="middle" fill="white" font-size="12">Grafana</text>
+                            <text x="240" y="65" text-anchor="middle" fill="white" font-size="9">:3000</text>
+
+                            <!-- Connexió Grafana -> Prometheus -->
+                            <path d="M180,50 L140,50" stroke="#ecf0f1" stroke-width="2" marker-end="url(#arrow)"/>
+                            <text x="160" y="42" text-anchor="middle" fill="#ecf0f1" font-size="8">datasource</text>
+
+                            <!-- Stork Server -->
+                            <rect x="350" y="20" width="120" height="60" fill="#27ae60" rx="5"/>
+                            <text x="410" y="50" text-anchor="middle" fill="white" font-size="12">Stork Server</text>
+                            <text x="410" y="65" text-anchor="middle" fill="white" font-size="9">:8080/metrics</text>
+
+                            <!-- Connexió Prometheus -> Stork -->
+                            <path d="M140,50 L350,50" stroke="#ecf0f1" stroke-width="2" stroke-dasharray="5,5"/>
+                            <text x="245" y="42" text-anchor="middle" fill="#ecf0f1" font-size="8">scrape</text>
+
+                            <!-- PostgreSQL -->
+                            <rect x="510" y="20" width="80" height="60" fill="#336791" rx="5"/>
+                            <text x="550" y="55" text-anchor="middle" fill="white" font-size="10">PostgreSQL</text>
+                            <line x1="470" y1="50" x2="510" y2="50" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <!-- Kea Primary -->
+                            <rect x="320" y="130" width="100" height="70" fill="#3498db" rx="5"/>
+                            <text x="370" y="155" text-anchor="middle" fill="white" font-size="10">kea-primary</text>
+                            <text x="370" y="170" text-anchor="middle" fill="white" font-size="8">10.50.1.10</text>
+                            <text x="370" y="185" text-anchor="middle" fill="#aaa" font-size="7">stork-agent</text>
+                            <line x1="370" y1="130" x2="410" y2="80" stroke="#27ae60" stroke-width="2"/>
+
+                            <!-- Kea Secondary -->
+                            <rect x="440" y="130" width="100" height="70" fill="#3498db" rx="5"/>
+                            <text x="490" y="155" text-anchor="middle" fill="white" font-size="10">kea-secondary</text>
+                            <text x="490" y="170" text-anchor="middle" fill="white" font-size="8">10.50.1.11</text>
+                            <text x="490" y="185" text-anchor="middle" fill="#aaa" font-size="7">stork-agent</text>
+                            <line x1="490" y1="130" x2="450" y2="80" stroke="#27ae60" stroke-width="2"/>
+
+                            <!-- Heartbeat -->
+                            <line x1="420" y1="165" x2="440" y2="165" stroke="#e74c3c" stroke-width="2"/>
+                            <text x="430" y="160" text-anchor="middle" fill="#e74c3c" font-size="7">HA</text>
+
+                            <!-- Relays -->
+                            <rect x="100" y="240" width="80" height="40" fill="#9b59b6" rx="5"/>
+                            <text x="140" y="265" text-anchor="middle" fill="white" font-size="9">relay-vlan10</text>
+                            <rect x="200" y="240" width="80" height="40" fill="#9b59b6" rx="5"/>
+                            <text x="240" y="265" text-anchor="middle" fill="white" font-size="9">relay-vlan20</text>
+                            <rect x="300" y="240" width="80" height="40" fill="#9b59b6" rx="5"/>
+                            <text x="340" y="265" text-anchor="middle" fill="white" font-size="9">relay-vlan30</text>
+
+                            <!-- Backend network -->
+                            <rect x="90" y="210" width="460" height="20" fill="#1a1a2e" stroke="#3498db" rx="3"/>
+                            <text x="320" y="223" text-anchor="middle" fill="#3498db" font-size="9">br-backend (10.50.1.0/24)</text>
+
+                            <!-- Clients -->
+                            <rect x="100" y="300" width="60" height="35" fill="#e74c3c" rx="5"/>
+                            <text x="130" y="322" text-anchor="middle" fill="white" font-size="8">clients</text>
+                            <rect x="210" y="300" width="60" height="35" fill="#e74c3c" rx="5"/>
+                            <text x="240" y="322" text-anchor="middle" fill="white" font-size="8">clients</text>
+                            <rect x="310" y="300" width="60" height="35" fill="#e74c3c" rx="5"/>
+                            <text x="340" y="322" text-anchor="middle" fill="white" font-size="8">clients</text>
+
+                            <!-- Línies relays a clients -->
+                            <line x1="140" y1="280" x2="130" y2="300" stroke="#ecf0f1" stroke-width="1"/>
+                            <line x1="240" y1="280" x2="240" y2="300" stroke="#ecf0f1" stroke-width="1"/>
+                            <line x1="340" y1="280" x2="340" y2="300" stroke="#ecf0f1" stroke-width="1"/>
+
+                            <!-- Línies kea a backend -->
+                            <line x1="370" y1="200" x2="370" y2="210" stroke="#ecf0f1" stroke-width="1"/>
+                            <line x1="490" y1="200" x2="490" y2="210" stroke="#ecf0f1" stroke-width="1"/>
+
+                            <!-- Línies relays a backend -->
+                            <line x1="140" y1="240" x2="140" y2="230" stroke="#ecf0f1" stroke-width="1"/>
+                            <line x1="240" y1="240" x2="240" y2="230" stroke="#ecf0f1" stroke-width="1"/>
+                            <line x1="340" y1="240" x2="340" y2="230" stroke="#ecf0f1" stroke-width="1"/>
+                        </svg>
+                    </div>
+                </section>
+
+                <section>
+                    <h3>Stack de Monitorització</h3>
+                    <div class="columns">
+                        <div class="column">
+                            <h4 class="highlight">Prometheus</h4>
+                            <ul>
+                                <li>Base de dades de sèries temporals</li>
+                                <li>Model pull (scraping)</li>
+                                <li>Llenguatge PromQL</li>
+                                <li>Gestió d'alertes</li>
+                            </ul>
+                        </div>
+                        <div class="column">
+                            <h4 class="highlight">Grafana</h4>
+                            <ul>
+                                <li>Visualització de mètriques</li>
+                                <li>Dashboards personalitzats</li>
+                                <li>Sistema d'alertes unificat</li>
+                                <li>Múltiples datasources</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="small-code">
+                    <h3>prometheus.yml</h3>
+                    <pre><code class="yaml"># Configuració de Prometheus
+global:
+  scrape_interval: 15s      # Cada quan recollir mètriques
+  evaluation_interval: 15s  # Cada quan avaluar regles
+
+# Carregar regles d'alertes
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  # Prometheus es monitoritza a si mateix
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Mètriques de Stork (Kea DHCP)
+  - job_name: 'stork'
+    static_configs:
+      - targets: ['clab-kea-lab-prometheus-stork-server:8080']
+    metrics_path: /metrics   # Endpoint de mètriques Stork</code></pre>
+                </section>
+
+                <section class="small-code">
+                    <h3>alerts.yml - Regles d'Alertes</h3>
+                    <pre><code class="yaml">groups:
+  - name: kea_dhcp_alerts
+    rules:
+      # Alerta: Pool DHCP per sobre del 80%
+      - alert: DHCPPoolHighUtilization
+        expr: |
+          (stork_dhcp4_addresses_assigned /
+           stork_dhcp4_addresses_total) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pool DHCP amb alta utilització"
+          description: "El pool té més del 80% d'IPs assignades"
+
+      # Alerta: Partner HA caigut
+      - alert: KeaHAPartnerDown
+        expr: stork_dhcp4_ha_state != 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Servidor Kea HA no disponible"</code></pre>
+                </section>
+
+                <section class="small-code">
+                    <h3>topology.clab.yml - Prometheus</h3>
+                    <pre><code class="yaml">    prometheus:
+      kind: linux
+      image: prom/prometheus:latest
+      binds:
+        # Muntar configuració com a només lectura
+        - ./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+        - ./configs/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      startup-delay: 25
+      ports:
+        - 9091:9090  # Exposar UI de Prometheus
+
+    grafana:
+      kind: linux
+      image: grafana/grafana:latest
+      env:
+        GF_SECURITY_ADMIN_USER: admin
+        GF_SECURITY_ADMIN_PASSWORD: admin
+        GF_USERS_ALLOW_SIGN_UP: "false"
+        GF_ALERTING_ENABLED: "true"
+        GF_UNIFIED_ALERTING_ENABLED: "true"
+      binds:
+        # Provisioning automàtic de datasources i dashboards
+        - ./configs/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+        - ./configs/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+        - ./configs/grafana/dashboards:/etc/grafana/dashboards:ro
+      ports:
+        - 3000:3000</code></pre>
+                </section>
+
+                <section class="small-code">
+                    <h3>Provisioning Grafana - Datasource</h3>
+                    <pre><code class="yaml"># configs/grafana/provisioning/datasources/prometheus.yml
+apiVersion: 1
+
+datasources:
+  - name: Prometheus           # Nom que apareix a Grafana
+    type: prometheus
+    access: proxy              # Grafana fa proxy de les peticions
+    url: http://clab-kea-lab-prometheus-prometheus:9090
+    isDefault: true            # Datasource per defecte
+    editable: false            # No permetre editar des de UI</code></pre>
+                    <br>
+                    <pre><code class="yaml"># configs/grafana/provisioning/dashboards/dashboards.yml
+apiVersion: 1
+
+providers:
+  - name: 'Kea DHCP'
+    folder: 'Kea DHCP'
+    type: file
+    options:
+      path: /etc/grafana/dashboards  # On trobar els JSON</code></pre>
+                </section>
+
+                <section>
+                    <h3>Habilitar Mètriques a Stork</h3>
+                    <pre><code class="yaml"># topology.clab.yml - Stork Server
+    stork-server:
+      kind: linux
+      image: stork-server:latest
+      env:
+        STORK_DATABASE_HOST: clab-kea-lab-prometheus-postgres
+        STORK_DATABASE_PORT: "5432"
+        STORK_DATABASE_NAME: stork
+        STORK_DATABASE_USER_NAME: postgres
+        STORK_DATABASE_PASSWORD: postgres
+        # IMPORTANT: Habilitar endpoint /metrics
+        STORK_SERVER_ENABLE_METRICS: "true"
+      ports:
+        - 8080:8080</code></pre>
+                    <p class="warning">⚠️ Sense <code>STORK_SERVER_ENABLE_METRICS</code>, Prometheus no pot recollir mètriques!</p>
+                </section>
+
+                <section>
+                    <h3>Mètriques Disponibles de Stork</h3>
+                    <table style="font-size: 0.6em;">
+                        <thead>
+                            <tr><th>Mètrica</th><th>Descripció</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>stork_dhcp4_addresses_assigned</code></td><td>IPs assignades</td></tr>
+                            <tr><td><code>stork_dhcp4_addresses_total</code></td><td>IPs totals al pool</td></tr>
+                            <tr><td><code>stork_dhcp4_packets_received_total</code></td><td>Paquets DHCP rebuts</td></tr>
+                            <tr><td><code>stork_dhcp4_packets_sent_total</code></td><td>Paquets DHCP enviats</td></tr>
+                            <tr><td><code>stork_dhcp4_ha_state</code></td><td>Estat HA (1=OK)</td></tr>
+                            <tr><td><code>stork_dhcp4_ha_unacked_clients</code></td><td>Clients sense ACK</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section>
+                    <h3>Accés als Serveis</h3>
+                    <table>
+                        <thead>
+                            <tr><th>Servei</th><th>URL</th><th>Credencials</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span style="color: #f46800;">Grafana</span></td>
+                                <td><code>http://localhost:3000</code></td>
+                                <td>admin / admin</td>
+                            </tr>
+                            <tr>
+                                <td><span style="color: #e6522c;">Prometheus</span></td>
+                                <td><code>http://localhost:9091</code></td>
+                                <td>-</td>
+                            </tr>
+                            <tr>
+                                <td><span style="color: #27ae60;">Stork</span></td>
+                                <td><code>http://localhost:8080</code></td>
+                                <td>admin / admin</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section>
+                    <h3>Verificar que Prometheus Funciona</h3>
+                    <pre><code class="bash"># Verificar targets (han d'estar UP)
+curl -s http://localhost:9091/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health}'
+
+# Consulta PromQL: IPs assignades
+curl -s 'http://localhost:9091/api/v1/query?query=stork_dhcp4_addresses_assigned'
+
+# Verificar alertes actives
+curl -s http://localhost:9091/api/v1/alerts</code></pre>
+                </section>
+
+                <section>
+                    <h3>Dashboard Kea DHCP</h3>
+                    <p>El dashboard inclou:</p>
+                    <ul>
+                        <li><span class="highlight">Leases Actius</span>: Nombre total d'IPs assignades</li>
+                        <li><span class="highlight">Utilització Pools</span>: Percentatge per subnet</li>
+                        <li><span class="highlight">Tràfic DHCP</span>: Discover, Offer, Request, Ack</li>
+                        <li><span class="highlight">Estat HA</span>: Indica si tots dos servidors estan operatius</li>
+                    </ul>
+                    <br>
+                    <p class="success">✓ El dashboard es carrega automàticament via provisioning</p>
+                </section>
+
+                <section>
+                    <h3>Desplegar Fase 5</h3>
+                    <pre><code class="bash"># Desplegar
+./scripts/deploy.sh prometheus
+
+# Verificar contenidors
+docker ps | grep kea-lab-prometheus
+
+# Comprovar mètriques Stork
+curl -s http://localhost:8080/metrics | head -20
+
+# Accedir a Grafana
+xdg-open http://localhost:3000
+
+# Destruir
+./scripts/destroy.sh prometheus</code></pre>
+                </section>
+            </section>
+
             <!-- ==================== RESUM ==================== -->
             <section>
                 <section>
@@ -1005,10 +1342,10 @@ docker exec clab-kea-lab-stork-postgres \
 ./scripts/build-images.sh
 
 # Desplegar una fase
-./scripts/deploy.sh 1|vlans|ha|stork
+./scripts/deploy.sh 1|vlans|ha|stork|prometheus
 
 # Destruir
-./scripts/destroy.sh 1|vlans|ha|stork
+./scripts/destroy.sh 1|vlans|ha|stork|prometheus
 
 # Test DHCP
 docker exec clab-kea-lab-*-client* udhcpc -i eth1 -n
@@ -1028,6 +1365,7 @@ docker logs clab-kea-lab-*-kea*</code></pre>
                         <li><span class="fase-badge fase2">Fase 2</span> Relays, giaddr, múltiples VLANs</li>
                         <li><span class="fase-badge fase3">Fase 3</span> HA, hooks, heartbeat, failover</li>
                         <li><span class="fase-badge fase4">Fase 4</span> Monitorització, API, supervisord</li>
+                        <li><span class="fase-badge fase5">Fase 5</span> Prometheus, Grafana, alertes</li>
                     </ol>
                 </section>
 
@@ -1038,6 +1376,8 @@ docker logs clab-kea-lab-*-kea*</code></pre>
                         <li><a href="https://kea.readthedocs.io/">Documentació Kea</a></li>
                         <li><a href="https://stork.readthedocs.io/">Documentació Stork</a></li>
                         <li><a href="https://containerlab.dev/">Containerlab</a></li>
+                        <li><a href="https://prometheus.io/docs/">Documentació Prometheus</a></li>
+                        <li><a href="https://grafana.com/docs/">Documentació Grafana</a></li>
                     </ul>
                 </section>
             </section>

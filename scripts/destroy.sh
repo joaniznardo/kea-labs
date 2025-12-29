@@ -9,11 +9,12 @@ usage() {
     echo "Ús: $0 <fase> [--cleanup]"
     echo ""
     echo "Fases disponibles:"
-    echo "  1, basic    - Fase 1: Kea bàsic"
-    echo "  2, vlans    - Fase 2: VLANs"
-    echo "  3, ha       - Fase 3: Alta disponibilitat"
-    echo "  4, stork    - Fase 4: Stork"
-    echo "  all         - Totes les fases"
+    echo "  1, basic      - Fase 1: Kea bàsic"
+    echo "  2, vlans      - Fase 2: VLANs"
+    echo "  3, ha         - Fase 3: Alta disponibilitat"
+    echo "  4, stork      - Fase 4: Stork"
+    echo "  5, prometheus - Fase 5: Prometheus + Grafana"
+    echo "  all           - Totes les fases"
     echo ""
     echo "Opcions:"
     echo "  --cleanup   - Eliminar també els volums i dades persistents"
@@ -56,12 +57,16 @@ case "$1" in
     4|stork)
         destroy_fase "fase4-stork"
         ;;
+    5|prometheus)
+        destroy_fase "fase5-prometheus"
+        ;;
     all)
         echo "=== Destruint totes les fases ==="
         destroy_fase "fase1-basic"
         destroy_fase "fase2-vlans"
         destroy_fase "fase3-ha"
         destroy_fase "fase4-stork"
+        destroy_fase "fase5-prometheus"
         ;;
     *)
         echo "Error: Fase desconeguda '$1'"

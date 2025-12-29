@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Laboratori modular de Kea DHCP4 amb Containerlab. Quatre fases progressives: bàsic → VLANs → HA → Stork.
+Laboratori modular de Kea DHCP4 amb Containerlab. Cinc fases progressives: bàsic → VLANs → HA → Stork → Prometheus/Grafana.
 
 ## Common Commands
 
@@ -13,10 +13,10 @@ Laboratori modular de Kea DHCP4 amb Containerlab. Quatre fases progressives: bà
 ./scripts/build-images.sh
 
 # Desplegar una fase (crea bridges automàticament)
-./scripts/deploy.sh 1|vlans|ha|stork
+./scripts/deploy.sh 1|vlans|ha|stork|prometheus
 
 # Destruir lab (--cleanup per eliminar bridges i volums)
-./scripts/destroy.sh 1|vlans|ha|stork|all [--cleanup]
+./scripts/destroy.sh 1|vlans|ha|stork|prometheus|all [--cleanup]
 
 # Test DHCP des del client (nicolaka/netshoot)
 docker exec clab-kea-lab-basic-client1 udhcpc -i eth1 -n
@@ -35,6 +35,7 @@ docker exec clab-kea-lab-<fase>-perfdhcp perfdhcp -4 -r 10 -n 100 10.50.10.1
 - **fase2-vlans/**: + 3 VLANs amb relays (dhcp-helper), shared-networks a kea config
 - **fase3-ha/**: + 2 servidors Kea load-balancing, hooks libdhcp_ha.so, xarxa heartbeat 10.50.99.0/24
 - **fase4-stork/**: + Stork server, kea-ctrl-agent, stork-agent (supervisord per múltiples processos)
+- **fase5-prometheus/**: + Prometheus + Grafana per mètriques i alertes (pool >80%, HA down)
 
 ## Network Configuration
 
@@ -48,7 +49,15 @@ docker exec clab-kea-lab-<fase>-perfdhcp perfdhcp -4 -r 10 -n 100 10.50.10.1
 
 - `*/topology.clab.yml`: Definició containerlab de cada fase
 - `*/configs/kea/kea-dhcp4.conf`: Configuració Kea (JSON)
-- `fase3-ha/`, `fase4-stork/`: Configs separades per kea-primary i kea-secondary
+- `fase3-ha/`, `fase4-stork/`, `fase5-prometheus/`: Configs separades per kea-primary i kea-secondary
+- `fase5-prometheus/configs/prometheus/`: prometheus.yml i alerts.yml
+- `fase5-prometheus/configs/grafana/`: Dashboard i provisioning
+
+## Monitoring URLs (fase5)
+
+- **Grafana**: http://localhost:3000 (admin/admin)
+- **Prometheus**: http://localhost:9091
+- **Stork**: http://localhost:8080 (admin/admin)
 
 ## Important Notes
 

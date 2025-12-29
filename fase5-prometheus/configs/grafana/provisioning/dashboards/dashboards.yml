@@ -1,0 +1,13 @@
+# Grafana dashboard provisioning
+apiVersion: 1
+
+providers:
+  - name: 'Kea DHCP Dashboards'
+    orgId: 1
+    folder: 'Kea DHCP'
+    folderUid: 'kea-dhcp'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/dashboards

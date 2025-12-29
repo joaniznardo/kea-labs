@@ -1,0 +1,53 @@
+# Alert rules for Kea DHCP monitoring
+groups:
+  - name: kea_dhcp_alerts
+    rules:
+      # Alert when a subnet pool is above 80% utilization
+      - alert: DHCPPoolHighUtilization
+        expr: (stork_dhcp4_addresses_assigned / stork_dhcp4_addresses_total) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DHCP Pool utilization above 80%"
+          description: "Subnet {{ $labels.subnet }} has {{ $value | printf \"%.1f\" }}% pool utilization"
+
+      # Alert when a subnet pool is above 95% utilization (critical)
+      - alert: DHCPPoolCriticalUtilization
+        expr: (stork_dhcp4_addresses_assigned / stork_dhcp4_addresses_total) * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "DHCP Pool utilization critical (>95%)"
+          description: "Subnet {{ $labels.subnet }} has {{ $value | printf \"%.1f\" }}% pool utilization - addresses almost exhausted!"
+
+      # Alert when HA peer is not in normal state
+      - alert: KeaHAPartnerDown
+        expr: stork_dhcp4_ha_state != 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kea HA partner not in normal state"
+          description: "Kea server {{ $labels.instance }} HA state is {{ $value }} (expected: 1 for normal)"
+
+      # Alert when Stork agent is unreachable
+      - alert: StorkAgentUnreachable
+        expr: up{job="stork"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Stork server unreachable"
+          description: "Cannot scrape metrics from Stork server"
+
+      # Alert when DHCP service has high NAK rate
+      - alert: DHCPHighNakRate
+        expr: rate(stork_dhcp4_packets_sent_total{type="nak"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High DHCP NAK rate detected"
+          description: "DHCP server is sending {{ $value | printf \"%.2f\" }} NAKs per second"

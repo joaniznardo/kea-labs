@@ -9,15 +9,16 @@ usage() {
     echo "Ús: $0 <fase>"
     echo ""
     echo "Fases disponibles:"
-    echo "  1, basic    - Fase 1: Kea bàsic"
-    echo "  2, vlans    - Fase 2: Múltiples VLANs amb relays"
-    echo "  3, ha       - Fase 3: Alta disponibilitat (load-balancing)"
-    echo "  4, stork    - Fase 4: Monitorització amb Stork"
+    echo "  1, basic      - Fase 1: Kea bàsic"
+    echo "  2, vlans      - Fase 2: Múltiples VLANs amb relays"
+    echo "  3, ha         - Fase 3: Alta disponibilitat (load-balancing)"
+    echo "  4, stork      - Fase 4: Monitorització amb Stork"
+    echo "  5, prometheus - Fase 5: Prometheus + Grafana"
     echo ""
     echo "Exemples:"
     echo "  $0 1"
     echo "  $0 vlans"
-    echo "  $0 ha"
+    echo "  $0 prometheus"
     exit 1
 }
 
@@ -38,6 +39,9 @@ case "$1" in
         ;;
     4|stork)
         FASE="fase4-stork"
+        ;;
+    5|prometheus)
+        FASE="fase5-prometheus"
         ;;
     *)
         echo "Error: Fase desconeguda '$1'"
@@ -74,7 +78,7 @@ case "$FASE" in
     fase1-basic)
         create_bridge "br-dhcp"
         ;;
-    fase2-vlans|fase3-ha|fase4-stork)
+    fase2-vlans|fase3-ha|fase4-stork|fase5-prometheus)
         create_bridge "br-backend"
         create_bridge "br-vlan10"
         create_bridge "br-vlan20"
@@ -85,7 +89,7 @@ echo ""
 
 # Verificar que les imatges necessàries existeixen
 echo ">>> Verificant imatges Docker..."
-if [ "$FASE" = "fase2-vlans" ] || [ "$FASE" = "fase3-ha" ] || [ "$FASE" = "fase4-stork" ]; then
+if [ "$FASE" = "fase2-vlans" ] || [ "$FASE" = "fase3-ha" ] || [ "$FASE" = "fase4-stork" ] || [ "$FASE" = "fase5-prometheus" ]; then
     if ! docker image inspect kea-relay:latest &>/dev/null; then
         echo "    Imatge kea-relay:latest no trobada. Construint..."
         "$SCRIPT_DIR/build-images.sh"
@@ -94,12 +98,18 @@ if [ "$FASE" = "fase2-vlans" ] || [ "$FASE" = "fase3-ha" ] || [ "$FASE" = "fase4
     fi
 fi
 
-if [ "$FASE" = "fase4-stork" ]; then
+if [ "$FASE" = "fase4-stork" ] || [ "$FASE" = "fase5-prometheus" ]; then
     if ! docker image inspect kea-stork:latest &>/dev/null; then
         echo "    Imatge kea-stork:latest no trobada. Construint..."
         "$SCRIPT_DIR/build-images.sh"
     else
         echo "    kea-stork:latest OK"
+    fi
+    if ! docker image inspect stork-server:latest &>/dev/null; then
+        echo "    Imatge stork-server:latest no trobada. Construint..."
+        "$SCRIPT_DIR/build-images.sh"
+    else
+        echo "    stork-server:latest OK"
     fi
 fi
 

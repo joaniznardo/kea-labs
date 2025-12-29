@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kea DHCP4 - Laboratori amb Containerlab</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/reset.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/reveal.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/theme/night.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/plugin/highlight/monokai.css">
+    <style>
+        .reveal h1, .reveal h2, .reveal h3 { text-transform: none; }
+        .reveal pre { width: 100%; font-size: 0.45em; }
+        .reveal pre code { max-height: 500px; }
+        .reveal .small-code pre { font-size: 0.4em; }
+        .reveal .tiny-code pre { font-size: 0.35em; }
+        .reveal ul { font-size: 0.85em; }
+        .reveal .columns { display: flex; gap: 20px; }
+        .reveal .column { flex: 1; }
+        .reveal .highlight { color: #42affa; }
+        .reveal .warning { color: #f0ad4e; }
+        .reveal .success { color: #5cb85c; }
+        .reveal .diagram { background: #1a1a2e; padding: 20px; border-radius: 10px; }
+        .reveal table { font-size: 0.7em; }
+        .reveal th, .reveal td { padding: 8px 15px; }
+        .fase-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.5em;
+            margin-bottom: 10px;
+        }
+        .fase1 { background: #3498db; }
+        .fase2 { background: #9b59b6; }
+        .fase3 { background: #e67e22; }
+        .fase4 { background: #27ae60; }
+    </style>
+</head>
+<body>
+    <div class="reveal">
+        <div class="slides">
+
+            <!-- ==================== PORTADA ==================== -->
+            <section>
+                <h1>Kea DHCP4</h1>
+                <h3>Laboratori amb Containerlab</h3>
+                <p>De bàsic a alta disponibilitat amb monitorització</p>
+                <br>
+                <table style="font-size: 0.6em; margin: auto;">
+                    <tr>
+                        <td><span class="fase-badge fase1">Fase 1</span></td>
+                        <td>Kea Bàsic</td>
+                    </tr>
+                    <tr>
+                        <td><span class="fase-badge fase2">Fase 2</span></td>
+                        <td>VLANs + Relays</td>
+                    </tr>
+                    <tr>
+                        <td><span class="fase-badge fase3">Fase 3</span></td>
+                        <td>Alta Disponibilitat</td>
+                    </tr>
+                    <tr>
+                        <td><span class="fase-badge fase4">Fase 4</span></td>
+                        <td>Monitorització Stork</td>
+                    </tr>
+                </table>
+            </section>
+
+            <!-- ==================== INTRODUCCIÓ ==================== -->
+            <section>
+                <section>
+                    <h2>Què és Kea?</h2>
+                    <ul>
+                        <li>Servidor DHCP modern d'ISC (successsor d'ISC DHCP)</li>
+                        <li>Suport per DHCPv4 i DHCPv6</li>
+                        <li>Configuració en <span class="highlight">JSON</span></li>
+                        <li>API REST per gestió</li>
+                        <li>Hooks extensibles</li>
+                        <li>Alta disponibilitat nativa</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h2>Què és Containerlab?</h2>
+                    <ul>
+                        <li>Eina per crear labs de xarxa amb contenidors</li>
+                        <li>Definició de topologia en <span class="highlight">YAML</span></li>
+                        <li>Gestió automàtica de xarxes i enllaços</li>
+                        <li>Integració amb Docker</li>
+                    </ul>
+                    <pre><code class="bash"># Desplegar un lab
+sudo containerlab deploy --topo topology.clab.yml
+
+# Destruir un lab
+sudo containerlab destroy --topo topology.clab.yml</code></pre>
+                </section>
+
+                <section>
+                    <h2>Estructura del Laboratori</h2>
+                    <pre><code class="plaintext">kea-lab/
+├── base/docker/           # Imatges base (relay)
+├── fase1-basic/           # Kea bàsic
+├── fase2-vlans/           # + VLANs amb relays
+├── fase3-ha/              # + Alta disponibilitat
+├── fase4-stork/           # + Monitorització
+└── scripts/
+    ├── deploy.sh          # Desplegar fase
+    ├── destroy.sh         # Destruir lab
+    └── build-images.sh    # Construir imatges</code></pre>
+                </section>
+            </section>
+
+            <!-- ==================== FASE 1: KEA BÀSIC ==================== -->
+            <section>
+                <section>
+                    <span class="fase-badge fase1">Fase 1</span>
+                    <h2>Kea DHCP4 Bàsic</h2>
+                    <p>Configuració mínima funcional</p>
+                </section>
+
+                <section>
+                    <h3>Topologia Fase 1</h3>
+                    <div class="diagram">
+                        <svg viewBox="0 0 500 200" style="width: 100%; max-width: 600px;">
+                            <!-- Bridge -->
+                            <rect x="150" y="80" width="200" height="40" fill="#3498db" rx="5"/>
+                            <text x="250" y="105" text-anchor="middle" fill="white" font-size="14">br-dhcp (10.50.10.0/24)</text>
+
+                            <!-- Kea Server -->
+                            <rect x="30" y="20" width="100" height="50" fill="#2ecc71" rx="5"/>
+                            <text x="80" y="50" text-anchor="middle" fill="white" font-size="12">kea</text>
+                            <text x="80" y="62" text-anchor="middle" fill="white" font-size="9">10.50.10.1</text>
+                            <line x1="80" y1="70" x2="80" y2="80" stroke="#ecf0f1" stroke-width="2"/>
+                            <line x1="80" y1="80" x2="150" y2="100" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <!-- Client -->
+                            <rect x="200" y="140" width="100" height="50" fill="#e74c3c" rx="5"/>
+                            <text x="250" y="165" text-anchor="middle" fill="white" font-size="12">client1</text>
+                            <text x="250" y="177" text-anchor="middle" fill="white" font-size="9">(DHCP)</text>
+                            <line x1="250" y1="140" x2="250" y2="120" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <!-- Perfdhcp -->
+                            <rect x="370" y="20" width="100" height="50" fill="#9b59b6" rx="5"/>
+                            <text x="420" y="50" text-anchor="middle" fill="white" font-size="12">perfdhcp</text>
+                            <line x1="420" y1="70" x2="420" y2="80" stroke="#ecf0f1" stroke-width="2"/>
+                            <line x1="420" y1="80" x2="350" y2="100" stroke="#ecf0f1" stroke-width="2"/>
+                        </svg>
+                    </div>
+                </section>
+
+                <section>
+                    <h3>Topologia YAML</h3>
+                    <pre><code class="yaml">name: kea-lab-basic
+
+topology:
+  nodes:
+    br-dhcp:
+      kind: bridge
+
+    kea:
+      kind: linux
+      image: docker.cloudsmith.io/isc/docker/kea-dhcp4:2.6.1
+      binds:
+        - ./configs/kea/kea-dhcp4.conf:/etc/kea/kea-dhcp4.conf:ro
+      exec:
+        - ip addr add 10.50.10.1/24 dev eth1
+
+    client1:
+      kind: linux
+      image: nicolaka/netshoot:latest
+
+  links:
+    - endpoints: ["kea:eth1", "br-dhcp:eth1"]
+    - endpoints: ["client1:eth1", "br-dhcp:eth2"]</code></pre>
+                </section>
+
+                <section>
+                    <h3>Estructura JSON de Kea</h3>
+                    <pre><code class="json">{
+    "Dhcp4": {
+        // Temporitzadors globals
+        "valid-lifetime": 4000,    // Durada del lease (segons)
+        "renew-timer": 1000,       // T1: quan renovar (50%)
+        "rebind-timer": 2000,      // T2: quan rebind (87.5%)
+
+        // Resta de configuració...
+    }
+}</code></pre>
+                    <p class="fragment"><span class="highlight">valid-lifetime</span>: Temps total que el client pot usar la IP</p>
+                    <p class="fragment"><span class="highlight">renew-timer</span>: Client contacta el servidor original</p>
+                    <p class="fragment"><span class="highlight">rebind-timer</span>: Client contacta qualsevol servidor</p>
+                </section>
+
+                <section>
+                    <h3>Configuració d'Interfícies</h3>
+                    <pre><code class="json">"interfaces-config": {
+    "interfaces": ["eth1"],
+    "dhcp-socket-type": "raw"
+}</code></pre>
+                    <ul>
+                        <li><span class="highlight">interfaces</span>: On escoltar peticions DHCP</li>
+                        <li><span class="highlight">dhcp-socket-type</span>:
+                            <ul>
+                                <li><code>raw</code>: Accés directe a capa 2 (recomanat)</li>
+                                <li><code>udp</code>: Socket UDP estàndard</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h3>Base de Dades de Leases</h3>
+                    <pre><code class="json">"lease-database": {
+    "type": "memfile",
+    "persist": true,
+    "name": "/var/lib/kea/kea-leases4.csv",
+    "lfc-interval": 3600
+}</code></pre>
+                    <ul>
+                        <li><span class="highlight">memfile</span>: Fitxer CSV simple (ideal per labs)</li>
+                        <li><span class="highlight">persist</span>: Guardar a disc</li>
+                        <li><span class="highlight">lfc-interval</span>: Neteja de leases expirats (segons)</li>
+                    </ul>
+                    <p class="fragment warning">Altres backends: MySQL, PostgreSQL, Cassandra</p>
+                </section>
+
+                <section>
+                    <h3>Opcions DHCP Globals</h3>
+                    <pre><code class="json">"option-data": [
+    {
+        "name": "domain-name-servers",
+        "data": "1.1.1.1, 1.0.0.1"
+    },
+    {
+        "name": "domain-search",
+        "data": "demokea.test"
+    }
+]</code></pre>
+                    <p>Opcions comunes:</p>
+                    <ul>
+                        <li><code>domain-name-servers</code> (opció 6): Servidors DNS</li>
+                        <li><code>domain-search</code> (opció 119): Domini de cerca</li>
+                        <li><code>routers</code> (opció 3): Gateway per defecte</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h3>Definició de Subnet</h3>
+                    <pre><code class="json">"subnet4": [
+    {
+        "id": 1,
+        "subnet": "10.50.10.0/24",
+        "pools": [
+            {
+                "pool": "10.50.10.100 - 10.50.10.200"
+            }
+        ],
+        "option-data": [
+            {
+                "name": "routers",
+                "data": "10.50.10.1"
+            }
+        ],
+        "reservations": []
+    }
+]</code></pre>
+                </section>
+
+                <section>
+                    <h3>Components de Subnet</h3>
+                    <ul>
+                        <li><span class="highlight">id</span>: Identificador únic (numèric)</li>
+                        <li><span class="highlight">subnet</span>: Rang de xarxa en CIDR</li>
+                        <li><span class="highlight">pools</span>: Rangs d'IPs a assignar</li>
+                        <li><span class="highlight">option-data</span>: Opcions específiques de la subnet</li>
+                        <li><span class="highlight">reservations</span>: IPs fixes per MAC</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h3>Logging</h3>
+                    <pre><code class="json">"loggers": [
+    {
+        "name": "kea-dhcp4",
+        "output_options": [
+            {
+                "output": "stdout",
+                "pattern": "%D{%Y-%m-%d %H:%M:%S.%q} %-5p [%c/%i] %m\n"
+            }
+        ],
+        "severity": "INFO",
+        "debuglevel": 0
+    }
+]</code></pre>
+                    <p>Severitats: <code>FATAL</code>, <code>ERROR</code>, <code>WARN</code>, <code>INFO</code>, <code>DEBUG</code></p>
+                </section>
+
+                <section>
+                    <h3>Desplegament i Test</h3>
+                    <pre><code class="bash"># Desplegar
+./scripts/deploy.sh 1
+
+# Provar DHCP des del client
+docker exec clab-kea-lab-basic-client1 udhcpc -i eth1 -n
+
+# Veure leases assignats
+docker exec clab-kea-lab-basic-kea \
+    cat /var/lib/kea/kea-leases4.csv
+
+# Destruir
+./scripts/destroy.sh 1</code></pre>
+                </section>
+            </section>
+
+            <!-- ==================== FASE 2: VLANS ==================== -->
+            <section>
+                <section>
+                    <span class="fase-badge fase2">Fase 2</span>
+                    <h2>VLANs amb DHCP Relay</h2>
+                    <p>Múltiples subxarxes amb relays</p>
+                </section>
+
+                <section>
+                    <h3>Per què necessitem relays?</h3>
+                    <ul>
+                        <li>DHCP Discover és <span class="highlight">broadcast</span></li>
+                        <li>Broadcast no travessa routers</li>
+                        <li>El relay converteix broadcast → unicast</li>
+                        <li>Afegeix el camp <span class="highlight">giaddr</span> (Gateway IP Address)</li>
+                    </ul>
+                    <div class="fragment">
+                        <p class="warning">giaddr indica al servidor quina subnet ha d'usar</p>
+                    </div>
+                </section>
+
+                <section>
+                    <h3>Topologia Fase 2</h3>
+                    <div class="diagram">
+                        <svg viewBox="0 0 600 350" style="width: 100%; max-width: 700px;">
+                            <!-- Kea Server -->
+                            <rect x="250" y="10" width="100" height="50" fill="#2ecc71" rx="5"/>
+                            <text x="300" y="35" text-anchor="middle" fill="white" font-size="12">kea</text>
+                            <text x="300" y="50" text-anchor="middle" fill="white" font-size="9">10.50.1.10</text>
+
+                            <!-- Backend Network -->
+                            <rect x="100" y="80" width="400" height="30" fill="#3498db" rx="5"/>
+                            <text x="300" y="100" text-anchor="middle" fill="white" font-size="11">br-backend (10.50.1.0/24)</text>
+                            <line x1="300" y1="60" x2="300" y2="80" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <!-- Relays -->
+                            <rect x="80" y="130" width="80" height="50" fill="#e67e22" rx="5"/>
+                            <text x="120" y="155" text-anchor="middle" fill="white" font-size="10">relay-vlan10</text>
+                            <text x="120" y="168" text-anchor="middle" fill="white" font-size="8">10.50.1.20</text>
+                            <line x1="120" y1="110" x2="120" y2="130" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <rect x="260" y="130" width="80" height="50" fill="#e67e22" rx="5"/>
+                            <text x="300" y="155" text-anchor="middle" fill="white" font-size="10">relay-vlan20</text>
+                            <text x="300" y="168" text-anchor="middle" fill="white" font-size="8">10.50.1.21</text>
+                            <line x1="300" y1="110" x2="300" y2="130" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <rect x="440" y="130" width="80" height="50" fill="#e67e22" rx="5"/>
+                            <text x="480" y="155" text-anchor="middle" fill="white" font-size="10">relay-vlan30</text>
+                            <text x="480" y="168" text-anchor="middle" fill="white" font-size="8">10.50.1.22</text>
+                            <line x1="480" y1="110" x2="480" y2="130" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <!-- VLAN Networks -->
+                            <rect x="50" y="200" width="140" height="25" fill="#9b59b6" rx="5"/>
+                            <text x="120" y="217" text-anchor="middle" fill="white" font-size="10">VLAN10 (10.50.10.0/24)</text>
+                            <line x1="120" y1="180" x2="120" y2="200" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <rect x="230" y="200" width="140" height="25" fill="#9b59b6" rx="5"/>
+                            <text x="300" y="217" text-anchor="middle" fill="white" font-size="10">VLAN20 (10.50.20.0/24)</text>
+                            <line x1="300" y1="180" x2="300" y2="200" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <rect x="410" y="200" width="140" height="25" fill="#9b59b6" rx="5"/>
+                            <text x="480" y="217" text-anchor="middle" fill="white" font-size="10">VLAN30 (10.50.30.0/24)</text>
+                            <line x1="480" y1="180" x2="480" y2="200" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <!-- Clients -->
+                            <rect x="80" y="250" width="80" height="40" fill="#e74c3c" rx="5"/>
+                            <text x="120" y="275" text-anchor="middle" fill="white" font-size="10">client-v10</text>
+                            <line x1="120" y1="225" x2="120" y2="250" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <rect x="260" y="250" width="80" height="40" fill="#e74c3c" rx="5"/>
+                            <text x="300" y="275" text-anchor="middle" fill="white" font-size="10">client-v20</text>
+                            <line x1="300" y1="225" x2="300" y2="250" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <rect x="440" y="250" width="80" height="40" fill="#e74c3c" rx="5"/>
+                            <text x="480" y="275" text-anchor="middle" fill="white" font-size="10">client-v30</text>
+                            <line x1="480" y1="225" x2="480" y2="250" stroke="#ecf0f1" stroke-width="2"/>
+                        </svg>
+                    </div>
+                </section>
+
+                <section>
+                    <h3>Flux DHCP amb Relay</h3>
+                    <ol>
+                        <li>Client envia <span class="highlight">DISCOVER</span> (broadcast)</li>
+                        <li>Relay rep el broadcast a la seva interfície</li>
+                        <li>Relay afegeix <span class="highlight">giaddr</span> = IP de la seva interfície client</li>
+                        <li>Relay reenvia com <span class="highlight">unicast</span> al servidor</li>
+                        <li>Servidor mira giaddr per saber quina subnet usar</li>
+                        <li>Servidor respon al relay</li>
+                        <li>Relay reenvia la resposta al client</li>
+                    </ol>
+                </section>
+
+                <section>
+                    <h3>Imatge del Relay (Dockerfile)</h3>
+                    <pre><code class="dockerfile">FROM alpine:3.19
+
+RUN apk add --no-cache dnsmasq iproute2 iputils
+
+COPY entrypoint-relay.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]</code></pre>
+                    <p>Usem <span class="highlight">dnsmasq</span> en mode relay (lleuger i simple)</p>
+                </section>
+
+                <section>
+                    <h3>Script del Relay</h3>
+                    <div class="small-code">
+                    <pre><code class="bash">#!/bin/sh
+# Variables: DHCP_SERVER, LISTEN_INTERFACE
+
+# Esperar que la interfície tingui IP
+RELAY_IP=$(ip -4 addr show "$LISTEN_INTERFACE" | \
+    awk '/inet / {split($2,a,"/"); print a[1]}')
+
+# Construir opcions per cada servidor
+RELAY_OPTS=""
+for server in $DHCP_SERVER; do
+    RELAY_OPTS="$RELAY_OPTS --dhcp-relay=${RELAY_IP},${server}"
+done
+
+# Executar dnsmasq en mode relay
+exec dnsmasq \
+    --no-daemon \
+    --port=0 \           # Deshabilitar DNS
+    $RELAY_OPTS \
+    --log-dhcp</code></pre>
+                    </div>
+                </section>
+
+                <section>
+                    <h3>Configuració del Relay a la Topologia</h3>
+                    <pre><code class="yaml">relay-vlan10:
+  kind: linux
+  image: kea-relay:latest
+  env:
+    DHCP_SERVER: "10.50.1.10"
+    LISTEN_INTERFACE: "eth2"
+  exec:
+    # eth1: cap a backend (servidor)
+    - ip addr add 10.50.1.20/24 dev eth1
+    # eth2: cap a clients (giaddr)
+    - ip addr add 10.50.10.1/24 dev eth2</code></pre>
+                    <p class="fragment"><span class="highlight">10.50.10.1</span> serà el giaddr que Kea usarà per identificar la subnet</p>
+                </section>
+
+                <section>
+                    <h3>Múltiples Subnets a Kea</h3>
+                    <div class="small-code">
+                    <pre><code class="json">"subnet4": [
+    {
+        "id": 10,
+        "subnet": "10.50.10.0/24",
+        "pools": [{ "pool": "10.50.10.100 - 10.50.10.200" }],
+        "option-data": [{ "name": "routers", "data": "10.50.10.1" }]
+    },
+    {
+        "id": 20,
+        "subnet": "10.50.20.0/24",
+        "pools": [{ "pool": "10.50.20.100 - 10.50.20.200" }],
+        "option-data": [{ "name": "routers", "data": "10.50.20.1" }]
+    },
+    {
+        "id": 30,
+        "subnet": "10.50.30.0/24",
+        "pools": [{ "pool": "10.50.30.100 - 10.50.30.200" }],
+        "option-data": [{ "name": "routers", "data": "10.50.30.1" }]
+    }
+]</code></pre>
+                    </div>
+                </section>
+
+                <section>
+                    <h3>Rutes al Servidor Kea</h3>
+                    <pre><code class="yaml">kea:
+  exec:
+    # IP a la xarxa backend
+    - ip addr add 10.50.1.10/24 dev eth1
+    # Rutes cap a les VLANs via els relays
+    - ip route add 10.50.10.0/24 via 10.50.1.20
+    - ip route add 10.50.20.0/24 via 10.50.1.21
+    - ip route add 10.50.30.0/24 via 10.50.1.22</code></pre>
+                    <p class="warning">El servidor ha de poder arribar als clients per respondre!</p>
+                </section>
+
+                <section>
+                    <h3>Test de la Fase 2</h3>
+                    <pre><code class="bash"># Desplegar
+./scripts/deploy.sh vlans
+
+# Provar cada VLAN
+docker exec clab-kea-lab-vlans-client-vlan10 \
+    dhclient -v eth1
+
+docker exec clab-kea-lab-vlans-client-vlan20 \
+    dhclient -v eth1
+
+docker exec clab-kea-lab-vlans-client-vlan30 \
+    dhclient -v eth1</code></pre>
+                </section>
+            </section>
+
+            <!-- ==================== FASE 3: HA ==================== -->
+            <section>
+                <section>
+                    <span class="fase-badge fase3">Fase 3</span>
+                    <h2>Alta Disponibilitat</h2>
+                    <p>Mode Load-Balancing amb dos servidors</p>
+                </section>
+
+                <section>
+                    <h3>Modes HA de Kea</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Mode</th>
+                                <th>Descripció</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="highlight">load-balancing</span></td>
+                                <td>Ambdós servidors actius, reparteixen càrrega</td>
+                            </tr>
+                            <tr>
+                                <td><span class="highlight">hot-standby</span></td>
+                                <td>Un actiu, l'altre en espera passiva</td>
+                            </tr>
+                            <tr>
+                                <td><span class="highlight">passive-backup</span></td>
+                                <td>Backup sense sincronització automàtica</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section>
+                    <h3>Topologia Fase 3</h3>
+                    <div class="diagram">
+                        <svg viewBox="0 0 600 300" style="width: 100%; max-width: 700px;">
+                            <!-- Heartbeat -->
+                            <rect x="180" y="5" width="240" height="25" fill="#e74c3c" rx="5"/>
+                            <text x="300" y="22" text-anchor="middle" fill="white" font-size="10">Heartbeat (10.50.99.0/24)</text>
+
+                            <!-- Kea Servers -->
+                            <rect x="150" y="40" width="100" height="50" fill="#2ecc71" rx="5"/>
+                            <text x="200" y="62" text-anchor="middle" fill="white" font-size="11">kea-primary</text>
+                            <text x="200" y="78" text-anchor="middle" fill="white" font-size="8">10.50.99.10</text>
+                            <line x1="200" y1="30" x2="200" y2="40" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <rect x="350" y="40" width="100" height="50" fill="#2ecc71" rx="5"/>
+                            <text x="400" y="62" text-anchor="middle" fill="white" font-size="11">kea-secondary</text>
+                            <text x="400" y="78" text-anchor="middle" fill="white" font-size="8">10.50.99.11</text>
+                            <line x1="400" y1="30" x2="400" y2="40" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <!-- Backend Network -->
+                            <rect x="100" y="110" width="400" height="25" fill="#3498db" rx="5"/>
+                            <text x="300" y="127" text-anchor="middle" fill="white" font-size="10">br-backend (10.50.1.0/24)</text>
+                            <line x1="200" y1="90" x2="200" y2="110" stroke="#ecf0f1" stroke-width="2"/>
+                            <line x1="400" y1="90" x2="400" y2="110" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <!-- Relays -->
+                            <rect x="80" y="150" width="70" height="40" fill="#e67e22" rx="5"/>
+                            <text x="115" y="175" text-anchor="middle" fill="white" font-size="9">relay-v10</text>
+                            <line x1="115" y1="135" x2="115" y2="150" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <rect x="265" y="150" width="70" height="40" fill="#e67e22" rx="5"/>
+                            <text x="300" y="175" text-anchor="middle" fill="white" font-size="9">relay-v20</text>
+                            <line x1="300" y1="135" x2="300" y2="150" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <rect x="450" y="150" width="70" height="40" fill="#e67e22" rx="5"/>
+                            <text x="485" y="175" text-anchor="middle" fill="white" font-size="9">relay-v30</text>
+                            <line x1="485" y1="135" x2="485" y2="150" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <!-- Arrow between servers -->
+                            <line x1="250" y1="65" x2="350" y2="65" stroke="#e74c3c" stroke-width="2" stroke-dasharray="5,5"/>
+                            <text x="300" y="58" text-anchor="middle" fill="#e74c3c" font-size="8">sync</text>
+
+                            <!-- VLANs -->
+                            <rect x="50" y="210" width="130" height="20" fill="#9b59b6" rx="3"/>
+                            <text x="115" y="224" text-anchor="middle" fill="white" font-size="9">VLAN10</text>
+                            <line x1="115" y1="190" x2="115" y2="210" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <rect x="235" y="210" width="130" height="20" fill="#9b59b6" rx="3"/>
+                            <text x="300" y="224" text-anchor="middle" fill="white" font-size="9">VLAN20</text>
+                            <line x1="300" y1="190" x2="300" y2="210" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <rect x="420" y="210" width="130" height="20" fill="#9b59b6" rx="3"/>
+                            <text x="485" y="224" text-anchor="middle" fill="white" font-size="9">VLAN30</text>
+                            <line x1="485" y1="190" x2="485" y2="210" stroke="#ecf0f1" stroke-width="2"/>
+                        </svg>
+                    </div>
+                </section>
+
+                <section>
+                    <h3>Xarxa Heartbeat</h3>
+                    <pre><code class="yaml"># Connexió directa entre servidors
+links:
+  # Xarxa Heartbeat HA (10.50.99.0/24)
+  - endpoints: ["kea-primary:eth2", "kea-secondary:eth2"]</code></pre>
+                    <ul>
+                        <li>Xarxa dedicada per sincronització</li>
+                        <li>Enllaç directe (sense switch/bridge)</li>
+                        <li>Heartbeat cada 10 segons</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h3>Control Socket</h3>
+                    <pre><code class="json">"control-socket": {
+    "socket-type": "unix",
+    "socket-name": "/run/kea/control_socket_4"
+}</code></pre>
+                    <ul>
+                        <li>Necessari per comunicació HA</li>
+                        <li>Permet comandes de gestió</li>
+                        <li>Usat per sincronitzar leases</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h3>Hooks Libraries</h3>
+                    <pre><code class="json">"hooks-libraries": [
+    {
+        "library": "/usr/lib/kea/hooks/libdhcp_lease_cmds.so"
+    },
+    {
+        "library": "/usr/lib/kea/hooks/libdhcp_ha.so",
+        "parameters": {
+            "high-availability": [...]
+        }
+    }
+]</code></pre>
+                    <ul>
+                        <li><span class="highlight">libdhcp_lease_cmds.so</span>: Comandes de gestió de leases</li>
+                        <li><span class="highlight">libdhcp_ha.so</span>: Funcionalitat HA</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h3>Configuració HA</h3>
+                    <div class="small-code">
+                    <pre><code class="json">"high-availability": [{
+    "this-server-name": "kea-primary",
+    "mode": "load-balancing",
+    "heartbeat-delay": 10000,
+    "max-response-delay": 60000,
+    "max-ack-delay": 5000,
+    "max-unacked-clients": 5,
+    "peers": [
+        {
+            "name": "kea-primary",
+            "url": "http://10.50.99.10:8000/",
+            "role": "primary",
+            "auto-failover": true
+        },
+        {
+            "name": "kea-secondary",
+            "url": "http://10.50.99.11:8000/",
+            "role": "secondary",
+            "auto-failover": true
+        }
+    ]
+}]</code></pre>
+                    </div>
+                </section>
+
+                <section>
+                    <h3>Paràmetres HA</h3>
+                    <table>
+                        <tbody>
+                            <tr>
+                                <td><code>this-server-name</code></td>
+                                <td>Nom d'aquest servidor (ha de coincidir amb un peer)</td>
+                            </tr>
+                            <tr>
+                                <td><code>heartbeat-delay</code></td>
+                                <td>Interval entre heartbeats (ms)</td>
+                            </tr>
+                            <tr>
+                                <td><code>max-response-delay</code></td>
+                                <td>Temps màxim sense resposta abans de failover</td>
+                            </tr>
+                            <tr>
+                                <td><code>max-unacked-clients</code></td>
+                                <td>Clients sense ACK abans de failover</td>
+                            </tr>
+                            <tr>
+                                <td><code>auto-failover</code></td>
+                                <td>Failover automàtic</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section>
+                    <h3>Diferències Primary vs Secondary</h3>
+                    <div class="columns">
+                        <div class="column">
+                            <h4>kea-primary</h4>
+                            <pre><code class="json">"this-server-name": "kea-primary"</code></pre>
+                            <p>IP: 10.50.99.10</p>
+                        </div>
+                        <div class="column">
+                            <h4>kea-secondary</h4>
+                            <pre><code class="json">"this-server-name": "kea-secondary"</code></pre>
+                            <p>IP: 10.50.99.11</p>
+                        </div>
+                    </div>
+                    <p class="fragment">La resta de configuració és <span class="highlight">idèntica</span>!</p>
+                </section>
+
+                <section>
+                    <h3>Relays amb Múltiples Servidors</h3>
+                    <pre><code class="yaml">relay-vlan10:
+  env:
+    DHCP_SERVER: "10.50.1.10 10.50.1.11"
+    LISTEN_INTERFACE: "eth2"</code></pre>
+                    <p>El relay envia a <span class="highlight">ambdós servidors</span></p>
+                    <p>Kea HA decideix qui respon</p>
+                </section>
+
+                <section>
+                    <h3>Multi-threading</h3>
+                    <pre><code class="json">"multi-threading": {
+    "enable-multi-threading": false
+}</code></pre>
+                    <p class="warning">HA requereix multi-threading desactivat!</p>
+                    <p>Limitació de la versió actual de Kea</p>
+                </section>
+            </section>
+
+            <!-- ==================== FASE 4: STORK ==================== -->
+            <section>
+                <section>
+                    <span class="fase-badge fase4">Fase 4</span>
+                    <h2>Monitorització amb Stork</h2>
+                    <p>Interfície web per gestionar Kea</p>
+                </section>
+
+                <section>
+                    <h3>Arquitectura Stork</h3>
+                    <div class="diagram">
+                        <svg viewBox="0 0 600 280" style="width: 100%; max-width: 700px;">
+                            <!-- Stork Server -->
+                            <rect x="230" y="10" width="140" height="60" fill="#27ae60" rx="5"/>
+                            <text x="300" y="35" text-anchor="middle" fill="white" font-size="12">Stork Server</text>
+                            <text x="300" y="55" text-anchor="middle" fill="white" font-size="9">:8080 (Web UI)</text>
+
+                            <!-- PostgreSQL -->
+                            <rect x="450" y="20" width="100" height="40" fill="#3498db" rx="5"/>
+                            <text x="500" y="45" text-anchor="middle" fill="white" font-size="10">PostgreSQL</text>
+                            <line x1="370" y1="40" x2="450" y2="40" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <!-- Kea Servers -->
+                            <rect x="100" y="120" width="180" height="80" fill="#2c3e50" rx="5" stroke="#2ecc71" stroke-width="2"/>
+                            <text x="190" y="140" text-anchor="middle" fill="white" font-size="11">kea-primary</text>
+
+                            <rect x="115" y="150" width="150" height="20" fill="#2ecc71" rx="3"/>
+                            <text x="190" y="164" text-anchor="middle" fill="white" font-size="9">kea-dhcp4</text>
+
+                            <rect x="115" y="175" width="150" height="20" fill="#9b59b6" rx="3"/>
+                            <text x="190" y="189" text-anchor="middle" fill="white" font-size="9">stork-agent → kea-ctrl-agent</text>
+
+                            <rect x="320" y="120" width="180" height="80" fill="#2c3e50" rx="5" stroke="#2ecc71" stroke-width="2"/>
+                            <text x="410" y="140" text-anchor="middle" fill="white" font-size="11">kea-secondary</text>
+
+                            <rect x="335" y="150" width="150" height="20" fill="#2ecc71" rx="3"/>
+                            <text x="410" y="164" text-anchor="middle" fill="white" font-size="9">kea-dhcp4</text>
+
+                            <rect x="335" y="175" width="150" height="20" fill="#9b59b6" rx="3"/>
+                            <text x="410" y="189" text-anchor="middle" fill="white" font-size="9">stork-agent → kea-ctrl-agent</text>
+
+                            <!-- Arrows -->
+                            <line x1="190" y1="120" x2="260" y2="70" stroke="#ecf0f1" stroke-width="2"/>
+                            <line x1="410" y1="120" x2="340" y2="70" stroke="#ecf0f1" stroke-width="2"/>
+
+                            <!-- Legend -->
+                            <text x="300" y="240" text-anchor="middle" fill="#ecf0f1" font-size="10">stork-agent es connecta a Stork Server</text>
+                            <text x="300" y="255" text-anchor="middle" fill="#ecf0f1" font-size="10">i obté info de Kea via kea-ctrl-agent</text>
+                        </svg>
+                    </div>
+                </section>
+
+                <section>
+                    <h3>Components</h3>
+                    <ul>
+                        <li><span class="highlight">Stork Server</span>: Interfície web + API + base de dades</li>
+                        <li><span class="highlight">Stork Agent</span>: Corre a cada servidor Kea, recol·lecta info</li>
+                        <li><span class="highlight">Kea Control Agent</span>: API REST per gestionar Kea</li>
+                        <li><span class="highlight">PostgreSQL</span>: Emmagatzema dades de Stork</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h3>Kea Control Agent</h3>
+                    <pre><code class="json">{
+    "Control-agent": {
+        "http-host": "0.0.0.0",
+        "http-port": 8000,
+
+        "control-sockets": {
+            "dhcp4": {
+                "socket-type": "unix",
+                "socket-name": "/var/run/kea/control_socket_4"
+            }
+        }
+    }
+}</code></pre>
+                    <p>Exposa l'API REST de Kea al port 8000</p>
+                </section>
+
+                <section>
+                    <h3>Dockerfile kea-stork</h3>
+                    <div class="small-code">
+                    <pre><code class="dockerfile">FROM ubuntu:22.04
+
+# Repositoris ISC
+RUN curl -1sLf \
+    'https://dl.cloudsmith.io/public/isc/kea-2-6/setup.deb.sh' | bash
+RUN curl -1sLf \
+    'https://dl.cloudsmith.io/public/isc/stork/setup.deb.sh' | bash
+
+# Instal·lar Kea + Stork Agent
+RUN apt-get update && apt-get install -y \
+    isc-kea-dhcp4 \
+    isc-kea-ctrl-agent \
+    isc-kea-hooks \
+    isc-stork-agent \
+    supervisor
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]</code></pre>
+                    </div>
+                </section>
+
+                <section>
+                    <h3>Supervisord</h3>
+                    <p>Gestiona múltiples processos en un contenidor</p>
+                    <div class="small-code">
+                    <pre><code class="ini">[supervisord]
+nodaemon=true
+
+[program:kea-dhcp4]
+command=/usr/sbin/kea-dhcp4 -c /etc/kea/kea-dhcp4.conf
+priority=10
+
+[program:kea-ctrl-agent]
+command=/usr/sbin/kea-ctrl-agent -c /etc/kea/kea-ctrl-agent.conf
+priority=20
+startsecs=5
+
+[program:stork-agent]
+command=/usr/bin/stork-agent \
+    --server-url %(ENV_STORK_SERVER_URL)s \
+    --host %(ENV_STORK_AGENT_HOST)s
+priority=30
+startsecs=10</code></pre>
+                    </div>
+                </section>
+
+                <section>
+                    <h3>Variables d'Entorn</h3>
+                    <pre><code class="yaml">kea-primary:
+  image: kea-stork:latest
+  env:
+    STORK_SERVER_URL: "http://clab-kea-lab-stork-stork-server:8080"
+    STORK_AGENT_HOST: "clab-kea-lab-stork-kea-primary"</code></pre>
+                    <ul>
+                        <li><code>STORK_SERVER_URL</code>: On trobar el Stork Server</li>
+                        <li><code>STORK_AGENT_HOST</code>: Com s'identifica aquest agent</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h3>Dockerfile Stork Server</h3>
+                    <pre><code class="dockerfile">FROM ubuntu:22.04
+
+RUN curl -1sLf \
+    'https://dl.cloudsmith.io/public/isc/stork/setup.deb.sh' | bash
+
+RUN apt-get update && apt-get install -y \
+    isc-stork-server \
+    postgresql-client
+
+EXPOSE 8080
+
+ENV STORK_DATABASE_HOST=postgres
+ENV STORK_DATABASE_PORT=5432
+ENV STORK_DATABASE_NAME=stork
+ENV STORK_DATABASE_USER_NAME=postgres
+ENV STORK_DATABASE_PASSWORD=postgres
+
+CMD ["stork-server"]</code></pre>
+                </section>
+
+                <section>
+                    <h3>Configuració de PostgreSQL</h3>
+                    <pre><code class="yaml">postgres:
+  kind: linux
+  image: postgres:16-alpine
+  env:
+    POSTGRES_PASSWORD: postgres
+    POSTGRES_USER: postgres
+    POSTGRES_DB: stork
+  startup-delay: 5
+  ports:
+    - 5432:5432</code></pre>
+                </section>
+
+                <section>
+                    <h3>Autorització de Màquines</h3>
+                    <pre><code class="bash"># Els agents s'han d'autoritzar manualment
+docker exec clab-kea-lab-stork-postgres \
+    psql -U postgres -d stork -c \
+    "UPDATE machine SET authorized = true;"
+
+# Verificar
+docker exec clab-kea-lab-stork-postgres \
+    psql -U postgres -d stork -c \
+    "SELECT id, address, authorized FROM machine;"</code></pre>
+                </section>
+
+                <section>
+                    <h3>Accés a Stork</h3>
+                    <ul>
+                        <li><span class="highlight">URL</span>: http://localhost:8080</li>
+                        <li><span class="highlight">Usuari</span>: admin</li>
+                        <li><span class="highlight">Contrasenya</span>: admin</li>
+                    </ul>
+                    <br><br>
+                    <p>Funcionalitats:</p>
+                    <ul>
+                        <li>Dashboard amb estat dels servidors</li>
+                        <li>Visualització de subnets i pools</li>
+                        <li>Estadístiques de leases</li>
+                        <li>Estat HA dels servidors</li>
+                    </ul>
+                </section>
+            </section>
+
+            <!-- ==================== RESUM ==================== -->
+            <section>
+                <section>
+                    <h2>Resum</h2>
+                </section>
+
+                <section>
+                    <h3>Xarxes del Lab</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Xarxa</th>
+                                <th>Rang</th>
+                                <th>Funció</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>VLAN 10</td>
+                                <td>10.50.10.0/24</td>
+                                <td>Clients (pool .100-.200)</td>
+                            </tr>
+                            <tr>
+                                <td>VLAN 20</td>
+                                <td>10.50.20.0/24</td>
+                                <td>Clients (pool .100-.200)</td>
+                            </tr>
+                            <tr>
+                                <td>VLAN 30</td>
+                                <td>10.50.30.0/24</td>
+                                <td>Clients (pool .100-.200)</td>
+                            </tr>
+                            <tr>
+                                <td>Backend</td>
+                                <td>10.50.1.0/24</td>
+                                <td>Kea ↔ Relays</td>
+                            </tr>
+                            <tr>
+                                <td>Heartbeat</td>
+                                <td>10.50.99.0/24</td>
+                                <td>HA entre servidors</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
+
+                <section>
+                    <h3>Comandes Útils</h3>
+                    <pre><code class="bash"># Construir imatges
+./scripts/build-images.sh
+
+# Desplegar una fase
+./scripts/deploy.sh 1|vlans|ha|stork
+
+# Destruir
+./scripts/destroy.sh 1|vlans|ha|stork
+
+# Test DHCP
+docker exec clab-kea-lab-*-client* udhcpc -i eth1 -n
+
+# Veure leases
+docker exec clab-kea-lab-*-kea* \
+    cat /var/lib/kea/kea-leases4.csv
+
+# Logs
+docker logs clab-kea-lab-*-kea*</code></pre>
+                </section>
+
+                <section>
+                    <h3>Progressió d'Aprenentatge</h3>
+                    <ol>
+                        <li><span class="fase-badge fase1">Fase 1</span> Entendre JSON de Kea, subnets, pools</li>
+                        <li><span class="fase-badge fase2">Fase 2</span> Relays, giaddr, múltiples VLANs</li>
+                        <li><span class="fase-badge fase3">Fase 3</span> HA, hooks, heartbeat, failover</li>
+                        <li><span class="fase-badge fase4">Fase 4</span> Monitorització, API, supervisord</li>
+                    </ol>
+                </section>
+
+                <section>
+                    <h2>Gràcies!</h2>
+                    <p>Recursos:</p>
+                    <ul>
+                        <li><a href="https://kea.readthedocs.io/">Documentació Kea</a></li>
+                        <li><a href="https://stork.readthedocs.io/">Documentació Stork</a></li>
+                        <li><a href="https://containerlab.dev/">Containerlab</a></li>
+                    </ul>
+                </section>
+            </section>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/dist/reveal.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/plugin/notes/notes.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.0/plugin/highlight/highlight.js"></script>
+    <script>
+        Reveal.initialize({
+            hash: true,
+            slideNumber: true,
+            plugins: [ RevealHighlight, RevealNotes ]
+        });
+    </script>
+</body>
+</html>

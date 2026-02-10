@@ -1,0 +1,29 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Instal·lar dependències bàsiques
+RUN apt-get update && apt-get install -y \
+    curl \
+    gnupg \
+    ca-certificates \
+    iproute2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Afegir repositori Cloudsmith per Kea 3.0 (inclou hooks)
+RUN curl -1sLf 'https://dl.cloudsmith.io/public/isc/kea-3-0/setup.deb.sh' | bash
+
+# Instal·lar Kea DHCP4 + DDNS + Hooks (HA, lease_cmds)
+RUN apt-get update && apt-get install -y \
+    isc-kea-dhcp4 \
+    isc-kea-dhcp-ddns \
+    isc-kea-hooks \
+    && rm -rf /var/lib/apt/lists/*
+
+# Crear directoris necessaris
+RUN mkdir -p /var/lib/kea /var/run/kea
+
+COPY entrypoint-kea-ddns.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

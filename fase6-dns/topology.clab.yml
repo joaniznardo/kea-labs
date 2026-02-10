@@ -1,13 +1,14 @@
-# Fase 3: Alta Disponibilitat (Load-Balancing)
-# =============================================
+# Fase 6: DNS amb BIND9 i DDNS
+# ============================
 # - 2 servidors Kea DHCP4 en mode load-balancing
-# - Xarxa heartbeat dedicada (10.50.99.0/24)
+# - 2 servidors BIND9 (primari/secundari) amb domini demoasix2025.test
+# - DDNS: Kea actualitza automàticament les zones DNS
 # - 3 VLANs amb relays
-# - Clients i perfdhcp
+# - BIND primari a backend (10.50.1.50), secundari a VLAN20 (10.50.20.51)
 #
-# Desplegament: ./scripts/deploy.sh ha
+# Desplegament: ./scripts/deploy.sh dns
 
-name: kea-lab-ha
+name: kea-lab-dns
 
 mgmt:
   network: clab-mgmt
@@ -20,8 +21,6 @@ topology:
     # ==================
     br-backend:
       kind: bridge
-      labels:
-        graph-icon: switch
     br-vlan10:
       kind: bridge
     br-vlan20:
@@ -30,17 +29,49 @@ topology:
       kind: bridge
 
     # ==================
+    # SERVIDORS DNS BIND9
+    # ==================
+
+    dns-primary:
+      kind: linux
+      image: ubuntu/bind9:latest
+      env:
+        BIND9_USER: root
+      binds:
+        - ./configs/bind-primary/named.conf:/etc/bind/named.conf:ro
+        - ./configs/bind-primary/zones:/var/lib/bind
+      startup-delay: 5
+      exec:
+        - ip addr add 10.50.1.50/24 dev eth1
+        - ip route add 10.50.10.0/24 via 10.50.1.20
+        - ip route add 10.50.20.0/24 via 10.50.1.21
+        - ip route add 10.50.30.0/24 via 10.50.1.22
+
+    dns-secondary:
+      kind: linux
+      image: ubuntu/bind9:latest
+      env:
+        BIND9_USER: root
+      binds:
+        - ./configs/bind-secondary/named.conf:/etc/bind/named.conf:ro
+      startup-delay: 10
+      exec:
+        - ip addr add 10.50.20.51/24 dev eth1
+        - ip route add 10.50.1.0/24 via 10.50.20.1
+        - ip route add 10.50.10.0/24 via 10.50.20.1
+        - ip route add 10.50.30.0/24 via 10.50.20.1
+
+    # ==================
     # SERVIDORS KEA HA
     # ==================
 
     kea-primary:
       kind: linux
-      image: docker.cloudsmith.io/isc/docker/kea-dhcp4:2.6.1
+      image: kea-ddns:latest
       binds:
         - ./configs/kea-primary/kea-dhcp4.conf:/etc/kea/kea-dhcp4.conf:ro
-      startup-delay: 5
-      labels:
-        graph-icon: switch
+        - ./configs/kea-primary/kea-dhcp-ddns.conf:/etc/kea/kea-dhcp-ddns.conf:ro
+      startup-delay: 15
       exec:
         - ip addr add 10.50.1.10/24 dev eth1
         - ip addr add 10.50.99.10/24 dev eth2
@@ -50,10 +81,11 @@ topology:
 
     kea-secondary:
       kind: linux
-      image: docker.cloudsmith.io/isc/docker/kea-dhcp4:2.6.1
+      image: kea-ddns:latest
       binds:
         - ./configs/kea-secondary/kea-dhcp4.conf:/etc/kea/kea-dhcp4.conf:ro
-      startup-delay: 5
+        - ./configs/kea-secondary/kea-dhcp-ddns.conf:/etc/kea/kea-dhcp-ddns.conf:ro
+      startup-delay: 15
       exec:
         - ip addr add 10.50.1.11/24 dev eth1
         - ip addr add 10.50.99.11/24 dev eth2
@@ -75,6 +107,9 @@ topology:
       exec:
         - ip addr add 10.50.1.20/24 dev eth1
         - ip addr add 10.50.10.1/24 dev eth2
+        - sysctl -w net.ipv4.ip_forward=1
+        - ip route add 10.50.20.0/24 via 10.50.1.21
+        - ip route add 10.50.30.0/24 via 10.50.1.22
 
     relay-vlan20:
       kind: linux
@@ -86,6 +121,9 @@ topology:
       exec:
         - ip addr add 10.50.1.21/24 dev eth1
         - ip addr add 10.50.20.1/24 dev eth2
+        - sysctl -w net.ipv4.ip_forward=1
+        - ip route add 10.50.10.0/24 via 10.50.1.20
+        - ip route add 10.50.30.0/24 via 10.50.1.22
 
     relay-vlan30:
       kind: linux
@@ -97,6 +135,9 @@ topology:
       exec:
         - ip addr add 10.50.1.22/24 dev eth1
         - ip addr add 10.50.30.1/24 dev eth2
+        - sysctl -w net.ipv4.ip_forward=1
+        - ip route add 10.50.10.0/24 via 10.50.1.20
+        - ip route add 10.50.20.0/24 via 10.50.1.21
 
     # ==================
     # CLIENTS
@@ -105,18 +146,23 @@ topology:
     client-vlan10:
       kind: linux
       image: nicolaka/netshoot:latest
-
-        #   client-vlan10-b:
-        #kind: linux
-        #image: nicolaka/netshoot:latest
+      exec:
+        - ip route del default
+        - umount /etc/resolv.conf
 
     client-vlan20:
       kind: linux
       image: nicolaka/netshoot:latest
+      exec:
+        - ip route del default
+        - umount /etc/resolv.conf
 
     client-vlan30:
       kind: linux
       image: nicolaka/netshoot:latest
+      exec:
+        - ip route del default
+        - umount /etc/resolv.conf
 
     # ==================
     # PROVES
@@ -128,12 +174,13 @@ topology:
       cmd: sleep infinity
 
   links:
-    # Xarxa Heartbeat HA (10.50.99.0/24) - directe entre servidors
+    # Xarxa Heartbeat HA (10.50.99.0/24) - directe entre servidors Kea
     - endpoints: ["kea-primary:eth2", "kea-secondary:eth2"]
 
-    # Xarxa Backend (Kea <-> Relays) - 10.50.1.0/24
+    # Xarxa Backend (Kea <-> Relays <-> DNS primari) - 10.50.1.0/24
     - endpoints: ["kea-primary:eth1", "br-backend:be-kp"]
     - endpoints: ["kea-secondary:eth1", "br-backend:be-ks"]
+    - endpoints: ["dns-primary:eth1", "br-backend:be-dp"]
     - endpoints: ["relay-vlan10:eth1", "br-backend:be-r10"]
     - endpoints: ["relay-vlan20:eth1", "br-backend:be-r20"]
     - endpoints: ["relay-vlan30:eth1", "br-backend:be-r30"]
@@ -141,11 +188,11 @@ topology:
     # VLAN 10 - 10.50.10.0/24
     - endpoints: ["relay-vlan10:eth2", "br-vlan10:v10-relay"]
     - endpoints: ["client-vlan10:eth1", "br-vlan10:v10-cli"]
-      #- endpoints: ["client-vlan10-b:eth1", "br-vlan10:v10-cli-b"]
     - endpoints: ["perfdhcp:eth1", "br-vlan10:v10-perf"]
 
-    # VLAN 20 - 10.50.20.0/24
+    # VLAN 20 - 10.50.20.0/24 (+ DNS secundari)
     - endpoints: ["relay-vlan20:eth2", "br-vlan20:v20-relay"]
+    - endpoints: ["dns-secondary:eth1", "br-vlan20:v20-ds"]
     - endpoints: ["client-vlan20:eth1", "br-vlan20:v20-cli"]
     - endpoints: ["perfdhcp:eth2", "br-vlan20:v20-perf"]
 

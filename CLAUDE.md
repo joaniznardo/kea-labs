@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Laboratori modular de Kea DHCP4 amb Containerlab. Cinc fases progressives: bàsic → VLANs → HA → Stork → Prometheus/Grafana.
+Laboratori modular de Kea DHCP4 amb Containerlab. Sis fases progressives: bàsic → VLANs → HA → Stork → Prometheus/Grafana → DNS/DDNS.
 
 ## Common Commands
 
@@ -13,10 +13,10 @@ Laboratori modular de Kea DHCP4 amb Containerlab. Cinc fases progressives: bàsi
 ./scripts/build-images.sh
 
 # Desplegar una fase (crea bridges automàticament)
-./scripts/deploy.sh 1|vlans|ha|stork|prometheus
+./scripts/deploy.sh 1|vlans|ha|stork|prometheus|dns
 
 # Destruir lab (--cleanup per eliminar bridges i volums)
-./scripts/destroy.sh 1|vlans|ha|stork|prometheus|all [--cleanup]
+./scripts/destroy.sh 1|vlans|ha|stork|prometheus|dns|all [--cleanup]
 
 # Test DHCP des del client (nicolaka/netshoot)
 docker exec clab-kea-lab-basic-client1 udhcpc -i eth1 -n
@@ -36,6 +36,7 @@ docker exec clab-kea-lab-<fase>-perfdhcp perfdhcp -4 -r 10 -n 100 10.50.10.1
 - **fase3-ha/**: + 2 servidors Kea load-balancing, hooks libdhcp_ha.so, xarxa heartbeat 10.50.99.0/24
 - **fase4-stork/**: + Stork server, kea-ctrl-agent, stork-agent (supervisord per múltiples processos)
 - **fase5-prometheus/**: + Prometheus + Grafana per mètriques i alertes (pool >80%, HA down)
+- **fase6-dns/**: + 2 servidors BIND9 (primari/secundari), DDNS automàtic des de Kea, domini demoasix2025.test
 
 ## Network Configuration
 
@@ -44,6 +45,8 @@ docker exec clab-kea-lab-<fase>-perfdhcp perfdhcp -4 -r 10 -n 100 10.50.10.1
 | VLAN 10/20/30 | 10.50.{10,20,30}.0/24 | Clients (pool .100-.200, gw .1) |
 | Backend | 10.50.1.0/24 | Kea ↔ Relays |
 | Heartbeat | 10.50.99.0/24 | HA entre servidors |
+| DNS primary | 10.50.1.50 (backend) | BIND9 primari (DDNS) |
+| DNS secondary | 10.50.20.51 (VLAN20) | BIND9 secundari |
 
 ## Key Files
 
@@ -66,7 +69,10 @@ docker exec clab-kea-lab-<fase>-perfdhcp perfdhcp -4 -r 10 -n 100 10.50.10.1
 - El script deploy.sh crea els bridges Linux automàticament (br-backend, br-vlan10/20/30)
 - Relays envien a múltiples servidors en HA: `DHCP_SERVER: "10.50.1.10 10.50.1.11"`
 - Fase 4 requereix imatge Stork: `docker.cloudsmith.io/isc/docker/stork:latest`
-- DNS: 1.1.1.1, 1.0.0.1 | Domini: demokea.test
+- DNS: 1.1.1.1, 1.0.0.1 | Domini: demokea.test (fases 1-5)
+- DNS: BIND9 primari 10.50.1.50, secundari 10.50.20.51 | Domini: demoasix2025.test (fase 6, DDNS)
+- Fase 6 usa Kea 3.0 (imatge kea-ddns:latest) amb multi-threading obligatori per HA
+- Relays amb ip_forward=1 encaminen consultes DNS entre VLANs
 - Els fitxers de config han de tenir permisos 644
 
 ## Troubleshooting

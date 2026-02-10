@@ -1,0 +1,30 @@
+$ORIGIN .
+$TTL 86400	; 1 day
+demoasix2025.test	IN SOA	dns-primary.demoasix2025.test. admin.demoasix2025.test. (
+				2025010104 ; serial
+				3600       ; refresh (1 hour)
+				1800       ; retry (30 minutes)
+				604800     ; expire (1 week)
+				86400      ; minimum (1 day)
+				)
+			NS	dns-primary.demoasix2025.test.
+			NS	dns-secondary.demoasix2025.test.
+$ORIGIN demoasix2025.test.
+$TTL 1333	; 22 minutes 13 seconds
+dhcp-10-50-10-100	A	10.50.10.100
+			DHCID	( AAEBYHjEj+e8z1VA9oMezCTz7CZFZnjDCLRE6cq8/Bat
+				FX8= ) ; 1 1 32
+dhcp-10-50-20-100	A	10.50.20.100
+			DHCID	( AAEB2tZqGky9BkyFrEai4g4/A6fLGCV6LBWHSFpZE6/+
+				1BA= ) ; 1 1 32
+dhcp-10-50-30-100	A	10.50.30.100
+			DHCID	( AAEBxDQHFrUnWw8CF9hm6ubWP7+UG+Bpx7CvGbBawXsI
+				pUc= ) ; 1 1 32
+$TTL 86400	; 1 day
+dns-primary		A	10.50.1.50
+dns-secondary		A	10.50.1.51
+kea-primary		A	10.50.1.10
+kea-secondary		A	10.50.1.11
+relay-vlan10		A	10.50.1.20
+relay-vlan20		A	10.50.1.21
+relay-vlan30		A	10.50.1.22

@@ -37,8 +37,9 @@ topology:
     # Contenidor per a proves de rendiment amb perfdhcp
     perfdhcp:
       kind: linux
-      image: docker.cloudsmith.io/isc/docker/kea-dhcp4:2.6.1
-      cmd: sleep infinity
+      image: nicolaka/netshoot:latest
+        #image: docker.cloudsmith.io/isc/docker/kea-dhcp4:2.6.1
+        #cmd: sleep infinity
 
   links:
     # Xarxa DHCP (10.50.10.0/24)

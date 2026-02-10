@@ -29,8 +29,16 @@ if [ -f "$BASE_DIR/fase4-stork/docker/Dockerfile.stork-server" ]; then
     echo "    stork-server:latest construïda correctament"
 fi
 
+# Construir imatge Kea amb DDNS (només si existeix el Dockerfile)
+if [ -f "$BASE_DIR/fase6-dns/docker/Dockerfile.kea-ddns" ]; then
+    echo ""
+    echo ">>> Construint imatge kea-ddns..."
+    docker build -t kea-ddns:latest -f "$BASE_DIR/fase6-dns/docker/Dockerfile.kea-ddns" "$BASE_DIR/fase6-dns/docker/"
+    echo "    kea-ddns:latest construïda correctament"
+fi
+
 echo ""
 echo "=== Imatges construïdes correctament ==="
 echo ""
 echo "Imatges disponibles:"
-docker images | grep -E "^(kea-relay|kea-stork|stork-server)" || true
+docker images | grep -E "^(kea-relay|kea-stork|kea-ddns|stork-server)" || true

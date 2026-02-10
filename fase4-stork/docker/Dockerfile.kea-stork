@@ -14,7 +14,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Afegir repositori Cloudsmith per Kea
-RUN curl -1sLf 'https://dl.cloudsmith.io/public/isc/kea-2-6/setup.deb.sh' | bash
+#RUN curl -1sLf 'https://dl.cloudsmith.io/public/isc/kea-2-6/setup.deb.sh' | bash
+RUN curl -1sLf 'https://dl.cloudsmith.io/public/isc/kea-3-0/setup.deb.sh' | bash
 
 # Afegir repositori Cloudsmith per Stork
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/isc/stork/setup.deb.sh' | bash

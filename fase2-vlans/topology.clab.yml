@@ -90,14 +90,23 @@ topology:
     client-vlan10:
       kind: linux
       image: nicolaka/netshoot:latest
+      exec:
+        - ip route delete default via 172.20.20.1
+        - umount /etc/resolv.conf
 
     client-vlan20:
       kind: linux
       image: nicolaka/netshoot:latest
+      exec:
+        - ip route delete default via 172.20.20.1
+        - umount /etc/resolv.conf
 
     client-vlan30:
       kind: linux
       image: nicolaka/netshoot:latest
+      exec:
+        - ip route delete default via 172.20.20.1
+        - umount /etc/resolv.conf
 
   links:
     # Xarxa Backend (Kea <-> Relays) - 10.50.1.0/24

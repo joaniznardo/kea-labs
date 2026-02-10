@@ -14,6 +14,7 @@ usage() {
     echo "  3, ha         - Fase 3: Alta disponibilitat"
     echo "  4, stork      - Fase 4: Stork"
     echo "  5, prometheus - Fase 5: Prometheus + Grafana"
+    echo "  6, dns       - Fase 6: DNS BIND9 + DDNS"
     echo "  all           - Totes les fases"
     echo ""
     echo "Opcions:"
@@ -60,6 +61,9 @@ case "$1" in
     5|prometheus)
         destroy_fase "fase5-prometheus"
         ;;
+    6|dns)
+        destroy_fase "fase6-dns"
+        ;;
     all)
         echo "=== Destruint totes les fases ==="
         destroy_fase "fase1-basic"
@@ -67,6 +71,7 @@ case "$1" in
         destroy_fase "fase3-ha"
         destroy_fase "fase4-stork"
         destroy_fase "fase5-prometheus"
+        destroy_fase "fase6-dns"
         ;;
     *)
         echo "Error: Fase desconeguda '$1'"

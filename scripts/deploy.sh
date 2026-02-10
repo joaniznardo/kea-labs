@@ -14,6 +14,7 @@ usage() {
     echo "  3, ha         - Fase 3: Alta disponibilitat (load-balancing)"
     echo "  4, stork      - Fase 4: Monitorització amb Stork"
     echo "  5, prometheus - Fase 5: Prometheus + Grafana"
+    echo "  6, dns       - Fase 6: DNS BIND9 + DDNS"
     echo ""
     echo "Exemples:"
     echo "  $0 1"
@@ -42,6 +43,9 @@ case "$1" in
         ;;
     5|prometheus)
         FASE="fase5-prometheus"
+        ;;
+    6|dns)
+        FASE="fase6-dns"
         ;;
     *)
         echo "Error: Fase desconeguda '$1'"
@@ -78,7 +82,7 @@ case "$FASE" in
     fase1-basic)
         create_bridge "br-dhcp"
         ;;
-    fase2-vlans|fase3-ha|fase4-stork|fase5-prometheus)
+    fase2-vlans|fase3-ha|fase4-stork|fase5-prometheus|fase6-dns)
         create_bridge "br-backend"
         create_bridge "br-vlan10"
         create_bridge "br-vlan20"
@@ -89,12 +93,21 @@ echo ""
 
 # Verificar que les imatges necessàries existeixen
 echo ">>> Verificant imatges Docker..."
-if [ "$FASE" = "fase2-vlans" ] || [ "$FASE" = "fase3-ha" ] || [ "$FASE" = "fase4-stork" ] || [ "$FASE" = "fase5-prometheus" ]; then
+if [ "$FASE" = "fase2-vlans" ] || [ "$FASE" = "fase3-ha" ] || [ "$FASE" = "fase4-stork" ] || [ "$FASE" = "fase5-prometheus" ] || [ "$FASE" = "fase6-dns" ]; then
     if ! docker image inspect kea-relay:latest &>/dev/null; then
         echo "    Imatge kea-relay:latest no trobada. Construint..."
         "$SCRIPT_DIR/build-images.sh"
     else
         echo "    kea-relay:latest OK"
+    fi
+fi
+
+if [ "$FASE" = "fase6-dns" ]; then
+    if ! docker image inspect kea-ddns:latest &>/dev/null; then
+        echo "    Imatge kea-ddns:latest no trobada. Construint..."
+        "$SCRIPT_DIR/build-images.sh"
+    else
+        echo "    kea-ddns:latest OK"
     fi
 fi
 

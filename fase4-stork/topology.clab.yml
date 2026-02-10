@@ -63,6 +63,8 @@ topology:
     kea-primary:
       kind: linux
       image: kea-stork:latest
+        #image:  jonasal/kea-dhcp4:3.1.4-alpine
+        #image:  jonasal/kea-dhcp4:3.1.4
       binds:
         - ./configs/kea-primary/kea-dhcp4.conf:/etc/kea/kea-dhcp4.conf:ro
         - ./configs/kea-primary/kea-ctrl-agent.conf:/etc/kea/kea-ctrl-agent.conf:ro
@@ -80,6 +82,8 @@ topology:
     kea-secondary:
       kind: linux
       image: kea-stork:latest
+        #image:  jonasal/kea-dhcp4:3.1.4-alpine
+        #image:  jonasal/kea-dhcp4:3.1.4
       binds:
         - ./configs/kea-secondary/kea-dhcp4.conf:/etc/kea/kea-dhcp4.conf:ro
         - ./configs/kea-secondary/kea-ctrl-agent.conf:/etc/kea/kea-ctrl-agent.conf:ro

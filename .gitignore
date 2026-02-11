@@ -9,6 +9,9 @@
 *.log
 *.bak
 
+# Assessment / exams
+assesment/
+
 # OS files
 .DS_Store
 Thumbs.db
